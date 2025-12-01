@@ -6,6 +6,12 @@ import { Database } from '@/lib/supabase'
 
 type Asistencia = Database['public']['Tables']['asistencias']['Row']
 type AsistenciaInsert = Database['public']['Tables']['asistencias']['Insert']
+type Alumno = Database['public']['Tables']['alumnos']['Row']
+
+type AsistenciaPorFecha = {
+  alumno: Alumno
+  asistencia: Asistencia | null
+}
 
 export function useAsistencia(cursoId?: string, fecha?: string) {
   return useQuery({
@@ -80,7 +86,7 @@ export function useAsistenciasAlumno(alumnoId: string) {
 }
 
 export function useAsistenciasPorFecha(cursoId: string, fecha: string) {
-  return useQuery({
+  return useQuery<AsistenciaPorFecha[]>({
     queryKey: ['asistencias', 'curso', cursoId, 'fecha', fecha],
     queryFn: async () => {
       // Primero obtenemos todos los alumnos del curso
@@ -91,19 +97,20 @@ export function useAsistenciasPorFecha(cursoId: string, fecha: string) {
         .order('apellido')
 
       if (alumnosError) throw alumnosError
+      if (!alumnos) return []
 
       // Luego obtenemos las asistencias para esa fecha
       const { data: asistencias, error: asistenciasError } = await supabase
         .from('asistencias')
         .select('*')
         .eq('fecha', fecha)
-        .in('alumno_id', alumnos.map(a => a.id))
+        .in('alumno_id', alumnos.map((a: Alumno) => a.id))
 
       if (asistenciasError) throw asistenciasError
 
       // Combinamos los datos
-      const resultado = alumnos.map(alumno => {
-        const asistencia = asistencias.find(a => a.alumno_id === alumno.id)
+      const resultado: AsistenciaPorFecha[] = alumnos.map((alumno: Alumno) => {
+        const asistencia = asistencias?.find((a: Asistencia) => a.alumno_id === alumno.id)
         return {
           alumno,
           asistencia: asistencia || null

@@ -32,7 +32,7 @@ export default function AsistenciaPage() {
     if (!asistenciaData) return
 
     const nuevasAsistencias: Record<string, 'presente' | 'ausente' | 'tarde'> = {}
-    asistenciaData.forEach(({ alumno, asistencia }) => {
+    asistenciaData.forEach(({ alumno, asistencia }: { alumno: { id: string }, asistencia: { estado: 'presente' | 'ausente' | 'tarde' } | null }) => {
       nuevasAsistencias[alumno.id] = asistencia?.estado || 'presente'
     })
     setAsistencias(nuevasAsistencias)
@@ -49,7 +49,7 @@ export default function AsistenciaPage() {
     if (!asistenciaData) return
     
     const nuevasAsistencias: Record<string, 'presente' | 'ausente' | 'tarde'> = {}
-    asistenciaData.forEach(({ alumno }) => {
+    asistenciaData.forEach(({ alumno }: { alumno: { id: string } }) => {
       nuevasAsistencias[alumno.id] = estado
     })
     setAsistencias(nuevasAsistencias)
@@ -58,7 +58,7 @@ export default function AsistenciaPage() {
   const handleGuardar = async () => {
     if (!user || !asistenciaData) return
 
-    const asistenciasArray = asistenciaData.map(({ alumno }) => ({
+    const asistenciasArray = asistenciaData.map(({ alumno }: { alumno: { id: string } }) => ({
       alumno_id: alumno.id,
       fecha,
       estado: asistencias[alumno.id] || 'presente',
@@ -107,7 +107,7 @@ export default function AsistenciaPage() {
 
   // Fechas con asistencia registrada (para el calendario)
   const fechasRegistradas = new Set(
-    (asistenciasCurso || []).map((a) => a.fecha)
+    (asistenciasCurso || []).map((a: { fecha: string }) => a.fecha)
   )
 
   const currentDate = new Date(fecha)
@@ -339,7 +339,7 @@ export default function AsistenciaPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {asistenciaData.map(({ alumno, asistencia: asistenciaExistente }) => (
+                {asistenciaData.map(({ alumno, asistencia: asistenciaExistente }: { alumno: { id: string, nombre: string, apellido: string, dni: string }, asistencia: { estado: 'presente' | 'ausente' | 'tarde' } | null }) => (
                   <TableRow key={alumno.id}>
                     <TableCell className="font-medium">
                       {alumno.nombre} {alumno.apellido}

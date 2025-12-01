@@ -86,7 +86,7 @@ export default function ReportesPage() {
             dni
           )
         `)
-        .in('alumno_id', alumnos.map(a => a.id))
+        .in('alumno_id', alumnos.map((a: { id: string }) => a.id))
         .order('fecha', { ascending: false })
 
       if (!asistenciasData || asistenciasData.length === 0) {
@@ -164,7 +164,7 @@ export default function ReportesPage() {
             dni
           )
         `)
-        .in('alumno_id', alumnos.map(a => a.id))
+        .in('alumno_id', alumnos.map((a: { id: string }) => a.id))
         .gte('fecha', fechaInicio)
         .lte('fecha', fechaFin)
         .order('fecha', { ascending: false })
@@ -200,18 +200,31 @@ export default function ReportesPage() {
   }
 
   // Exportar lista de alumnos
-  const exportarAlumnos = () => {
+  const exportarAlumnos = async () => {
     if (!cursoSeleccionado || !curso) {
       alert('Selecciona un curso primero')
       return
     }
 
-    if (!curso.alumnos || curso.alumnos.length === 0) {
+    // Necesitamos obtener los datos completos de los alumnos
+    const { supabase, IS_SUPABASE_CONFIGURED } = await import('@/lib/supabase')
+    
+    if (!IS_SUPABASE_CONFIGURED || !supabase) {
+      alert('Modo local: esta función requiere Supabase configurado')
+      return
+    }
+
+    const { data: alumnosCompletos } = await supabase
+      .from('alumnos')
+      .select('*')
+      .eq('curso_id', cursoSeleccionado)
+
+    if (!alumnosCompletos || alumnosCompletos.length === 0) {
       alert('Este curso no tiene alumnos inscriptos')
       return
     }
 
-    const data = curso.alumnos.map(alumno => ({
+    const data = alumnosCompletos.map((alumno: { nombre: string, apellido: string, dni: string, creado_en: string }) => ({
       'Curso': curso.nombre,
       'Nombre': alumno.nombre,
       'Apellido': alumno.apellido,
@@ -254,7 +267,7 @@ export default function ReportesPage() {
       const { data: asistenciasData } = await supabase
         .from('asistencias')
         .select('*')
-        .in('alumno_id', alumnos.map(a => a.id))
+        .in('alumno_id', alumnos.map((a: { id: string }) => a.id))
 
       if (!asistenciasData) {
         alert('Error al obtener asistencias')
@@ -263,11 +276,11 @@ export default function ReportesPage() {
       }
 
       // Calcular resumen por alumno
-      const resumen = alumnos.map(alumno => {
-        const asistenciasAlumno = asistenciasData.filter(a => a.alumno_id === alumno.id)
-        const presentes = asistenciasAlumno.filter(a => a.estado === 'presente').length
-        const ausentes = asistenciasAlumno.filter(a => a.estado === 'ausente').length
-        const tardes = asistenciasAlumno.filter(a => a.estado === 'tarde').length
+      const resumen = alumnos.map((alumno: { id: string, nombre: string, apellido: string, dni: string }) => {
+        const asistenciasAlumno = asistenciasData.filter((a: { alumno_id: string }) => a.alumno_id === alumno.id)
+        const presentes = asistenciasAlumno.filter((a: { estado: string }) => a.estado === 'presente').length
+        const ausentes = asistenciasAlumno.filter((a: { estado: string }) => a.estado === 'ausente').length
+        const tardes = asistenciasAlumno.filter((a: { estado: string }) => a.estado === 'tarde').length
         const total = asistenciasAlumno.length
         const porcentaje = total > 0 ? ((presentes + tardes) / total * 100).toFixed(2) : '0.00'
 
