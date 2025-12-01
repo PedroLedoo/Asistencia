@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # Base de datos PostgreSQL
+  database:
+    image: postgres:15-alpine
+    container_name: asistencias-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: asistencias_db
+      POSTGRES_USER: asistencias_user
+      POSTGRES_PASSWORD: asistencias_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - asistencias-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: asistencias-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://asistencias_user:asistencias_password@database:5432/asistencias_db
+      JWT_SECRET: tu_jwt_secret_super_seguro_para_produccion
+      JWT_EXPIRES_IN: 7d
+      PORT: 3001
+      FRONTEND_URL: http://localhost:3000
+    ports:
+      - "3001:3001"
+    depends_on:
+      - database
+    networks:
+      - asistencias-network
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  # Frontend (opcional, para desarrollo)
+  frontend:
+    image: node:18-alpine
+    container_name: asistencias-frontend
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host"
+    environment:
+      VITE_API_URL: http://localhost:3001/api
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - asistencias-network
+
+volumes:
+  postgres_data:
+
+networks:
+  asistencias-network:
+    driver: bridge

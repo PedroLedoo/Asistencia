@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: sistema-asistencias-backend
+    env: node
+    buildCommand: npm install && npm run db:generate
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sistema-asistencias-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: FRONTEND_URL
+        value: https://sistema-asistencias-frontend.onrender.com
+
+databases:
+  - name: sistema-asistencias-db
+    databaseName: asistencias_db
+    user: asistencias_user

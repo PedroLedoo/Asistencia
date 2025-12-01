@@ -1,0 +1,115 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(PROFESOR)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  courses Course[]
+
+  @@map("users")
+}
+
+model Course {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  year        Int
+  division    String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relaciones
+  teacherId   String
+  teacher     User         @relation(fields: [teacherId], references: [id])
+  enrollments Enrollment[]
+  attendances Attendance[]
+
+  @@map("courses")
+}
+
+model Student {
+  id        String   @id @default(uuid())
+  dni       String   @unique
+  firstName String
+  lastName  String
+  email     String?
+  phone     String?
+  address   String?
+  birthDate DateTime?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  enrollments Enrollment[]
+  attendances Attendance[]
+
+  @@map("students")
+}
+
+model Enrollment {
+  id         String   @id @default(uuid())
+  enrollDate DateTime @default(now())
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relaciones
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id])
+  courseId  String
+  course    Course  @relation(fields: [courseId], references: [id])
+
+  // Un estudiante solo puede estar inscrito una vez por curso
+  @@unique([studentId, courseId])
+  @@map("enrollments")
+}
+
+model Attendance {
+  id        String          @id @default(uuid())
+  date      DateTime
+  status    AttendanceStatus @default(PRESENTE)
+  notes     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  // Relaciones
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id])
+  courseId  String
+  course    Course  @relation(fields: [courseId], references: [id])
+
+  // Una asistencia por estudiante por curso por día
+  @@unique([studentId, courseId, date])
+  @@map("attendances")
+}
+
+enum Role {
+  ADMIN
+  PROFESOR
+}
+
+enum AttendanceStatus {
+  PRESENTE
+  AUSENTE
+  TARDANZA
+  JUSTIFICADO
+}
