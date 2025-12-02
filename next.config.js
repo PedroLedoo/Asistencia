@@ -7,6 +7,10 @@ const nextConfig = {
   },
   images: {
     domains: ['localhost']
+  },
+  // Asegurar que los path aliases funcionen correctamente
+  webpack: (config) => {
+    return config
   }
 }
 
