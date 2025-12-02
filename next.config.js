@@ -9,7 +9,14 @@ const nextConfig = {
     domains: ['localhost']
   },
   // Asegurar que los path aliases funcionen correctamente
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
+    // Asegurar que los path aliases funcionen en producción
+    if (!isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        '@': require('path').resolve(__dirname, 'src'),
+      }
+    }
     return config
   }
 }
