@@ -1,3 +1,5 @@
+const path = require('path')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
@@ -8,14 +10,12 @@ const nextConfig = {
   images: {
     domains: ['localhost']
   },
-  // Asegurar que los path aliases funcionen correctamente
-  webpack: (config, { isServer }) => {
-    // Asegurar que los path aliases funcionen en producción
-    if (!isServer) {
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        '@': require('path').resolve(__dirname, 'src'),
-      }
+  // Asegurar que los path aliases funcionen correctamente en producción
+  webpack: (config) => {
+    // Configurar path aliases para cliente y servidor
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': path.resolve(process.cwd(), 'src'),
     }
     return config
   }
