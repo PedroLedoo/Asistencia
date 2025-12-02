@@ -1,20 +1,21 @@
 'use client'
 
-import { useParams } from 'next/navigation'
-import { useCurso } from '@/hooks/useCursos'
+import { useParams, useRouter } from 'next/navigation'
+import { useCurso, useDeleteCurso } from '@/hooks/useCursos'
 import { useCreateAlumno, useDeleteAlumno } from '@/hooks/useAlumnos'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { BookOpen, Users, Plus, Calendar, ArrowLeft, Trash2 } from 'lucide-react'
+import { BookOpen, Users, Plus, Calendar, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 import { exportToCSV } from '@/lib/utils'
 
 export default function CursoDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const cursoId = params.id as string
   
   const [showAddForm, setShowAddForm] = useState(false)
@@ -27,6 +28,7 @@ export default function CursoDetailPage() {
   const { data: curso, isLoading } = useCurso(cursoId)
   const createAlumno = useCreateAlumno()
   const deleteAlumno = useDeleteAlumno()
+  const deleteCurso = useDeleteCurso()
 
   const handleAddAlumno = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,6 +52,24 @@ export default function CursoDetailPage() {
         await deleteAlumno.mutateAsync(alumnoId)
       } catch (error) {
         alert('Error al eliminar alumno')
+      }
+    }
+  }
+
+  const handleDeleteCurso = async () => {
+    if (!curso) return
+
+    const confirmMessage = curso.alumnos && curso.alumnos.length > 0
+      ? `⚠️ ADVERTENCIA: Este curso tiene ${curso.alumnos.length} alumno(s) inscripto(s).\n\n¿Estás seguro de eliminar el curso "${curso.nombre}"?\n\nEsta acción eliminará también todos los alumnos y asistencias asociadas.`
+      : `¿Estás seguro de eliminar el curso "${curso.nombre}"?`
+
+    if (confirm(confirmMessage)) {
+      try {
+        await deleteCurso.mutateAsync(cursoId)
+        alert('Curso eliminado exitosamente')
+        router.push('/cursos')
+      } catch (error) {
+        alert('Error al eliminar el curso')
       }
     }
   }
@@ -80,8 +100,26 @@ export default function CursoDetailPage() {
 
   if (!curso) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-xl font-semibold text-gray-900">Curso no encontrado</h2>
+      <div className="text-center py-12 space-y-6">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Curso no encontrado</h2>
+          <p className="text-gray-600">
+            El curso que buscas no existe o no tienes permisos para verlo.
+          </p>
+        </div>
+        <div className="flex justify-center space-x-4">
+          <Button asChild variant="outline">
+            <Link href="/cursos">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver a Cursos
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/dashboard">
+              Ir al Dashboard
+            </Link>
+          </Button>
+        </div>
       </div>
     )
   }
@@ -104,12 +142,24 @@ export default function CursoDetailPage() {
             Creado el {new Date(curso.creado_en).toLocaleDateString('es-AR')}
           </p>
         </div>
-        <Button asChild size="lg" className="bg-green-600 hover:bg-green-700">
-          <Link href={`/cursos/${cursoId}/asistencia`}>
-            <Calendar className="mr-2 h-5 w-5" />
-            Tomar Asistencia
-          </Link>
-        </Button>
+        <div className="flex items-center space-x-3">
+          <Button asChild size="lg" className="bg-green-600 hover:bg-green-700">
+            <Link href={`/cursos/${cursoId}/asistencia`}>
+              <Calendar className="mr-2 h-5 w-5" />
+              Tomar Asistencia
+            </Link>
+          </Button>
+          <Button 
+            variant="outline" 
+            size="lg"
+            onClick={handleDeleteCurso}
+            disabled={deleteCurso.isPending}
+            className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+          >
+            <Trash2 className="mr-2 h-5 w-5" />
+            {deleteCurso.isPending ? 'Eliminando...' : 'Eliminar Curso'}
+          </Button>
+        </div>
       </div>
 
       {/* Estadísticas */}

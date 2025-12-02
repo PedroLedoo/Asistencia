@@ -1,13 +1,30 @@
 'use client'
 
-import { useCursos } from '@/hooks/useCursos'
+import { useCursos, useDeleteCurso } from '@/hooks/useCursos'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { BookOpen, Users, Plus, Calendar, ArrowRight, ArrowLeft } from 'lucide-react'
+import { BookOpen, Users, Plus, Calendar, ArrowRight, ArrowLeft, Trash2 } from 'lucide-react'
 import Link from 'next/link'
+import { useState } from 'react'
 
 export default function CursosPage() {
   const { data: cursos, isLoading } = useCursos()
+  const deleteCurso = useDeleteCurso()
+  const [cursoEliminando, setCursoEliminando] = useState<string | null>(null)
+
+  const handleDeleteCurso = async (cursoId: string, nombreCurso: string) => {
+    if (confirm(`¿Estás seguro de eliminar el curso "${nombreCurso}"?\n\nEsta acción eliminará también todos los alumnos y asistencias asociadas.`)) {
+      setCursoEliminando(cursoId)
+      try {
+        await deleteCurso.mutateAsync(cursoId)
+        alert('Curso eliminado exitosamente')
+      } catch (error) {
+        alert('Error al eliminar el curso')
+      } finally {
+        setCursoEliminando(null)
+      }
+    }
+  }
 
   if (isLoading) {
     return (
@@ -83,6 +100,16 @@ export default function CursosPage() {
                       Tomar Asistencia
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleDeleteCurso(curso.id, curso.nombre)}
+                    disabled={cursoEliminando === curso.id || deleteCurso.isPending}
+                    className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {cursoEliminando === curso.id ? 'Eliminando...' : 'Eliminar Curso'}
                   </Button>
                 </div>
               </CardContent>

@@ -78,6 +78,38 @@ export function useCurso(id: string) {
   return useQuery<CursoWithRelations | null>({
     queryKey: ['curso', id],
     queryFn: async () => {
+      // Verificar si Supabase está configurado
+      if (!IS_SUPABASE_CONFIGURED || !supabase) {
+        // Modo local: leer de localStorage
+        if (typeof window !== 'undefined') {
+          const cursosLocales = JSON.parse(localStorage.getItem('cursos_locales') || '[]')
+          const curso = cursosLocales.find((c: any) => c.id === id)
+          
+          if (!curso) return null
+
+          const storedUser = localStorage.getItem('localUser')
+          const user = storedUser ? JSON.parse(storedUser) : null
+
+          // Leer alumnos locales
+          const alumnosLocales = JSON.parse(localStorage.getItem('alumnos_locales') || '[]')
+          const alumnosDelCurso = alumnosLocales.filter((a: any) => a.curso_id === id)
+
+          return {
+            ...curso,
+            profesores: user ? { id: user.id, nombre: user.user_metadata?.nombre || user.email, email: user.email } : null,
+            alumnos: alumnosDelCurso.map((a: any) => ({
+              id: a.id,
+              nombre: a.nombre,
+              apellido: a.apellido,
+              dni: a.dni,
+              creado_en: a.creado_en
+            }))
+          } as CursoWithRelations
+        }
+        return null
+      }
+
+      // Modo Supabase: usar la base de datos real
       const { data, error } = await supabase
         .from('cursos')
         .select(`
@@ -173,6 +205,29 @@ export function useDeleteCurso() {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      // Verificar si Supabase está configurado
+      if (!IS_SUPABASE_CONFIGURED || !supabase) {
+        // Modo local: eliminar de localStorage
+        if (typeof window !== 'undefined') {
+          const cursosLocales = JSON.parse(localStorage.getItem('cursos_locales') || '[]')
+          const cursosFiltrados = cursosLocales.filter((c: any) => c.id !== id)
+          localStorage.setItem('cursos_locales', JSON.stringify(cursosFiltrados))
+
+          // También eliminar alumnos asociados
+          const alumnosLocales = JSON.parse(localStorage.getItem('alumnos_locales') || '[]')
+          const alumnosFiltrados = alumnosLocales.filter((a: any) => a.curso_id !== id)
+          localStorage.setItem('alumnos_locales', JSON.stringify(alumnosFiltrados))
+
+          // Eliminar asistencias asociadas
+          const asistenciasLocales = JSON.parse(localStorage.getItem('asistencias_locales') || '[]')
+          const alumnosIds = alumnosLocales.filter((a: any) => a.curso_id === id).map((a: any) => a.id)
+          const asistenciasFiltradas = asistenciasLocales.filter((a: any) => !alumnosIds.includes(a.alumno_id))
+          localStorage.setItem('asistencias_locales', JSON.stringify(asistenciasFiltradas))
+        }
+        return
+      }
+
+      // Modo Supabase: usar la base de datos real
       const { error } = await supabase
         .from('cursos')
         .delete()

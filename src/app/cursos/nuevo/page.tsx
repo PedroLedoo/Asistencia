@@ -29,9 +29,15 @@ export default function NuevoCursoPage() {
         profesor_id: user.id
       })
       
+      // Esperar un momento para que se actualice la cache
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Redirigir al detalle del curso
       router.push(`/cursos/${nuevoCurso.id}`)
+      router.refresh() // Forzar actualización
     } catch (error) {
-      alert('Error al crear el curso')
+      console.error('Error al crear curso:', error)
+      alert('Error al crear el curso. Intenta nuevamente.')
     }
   }
 
