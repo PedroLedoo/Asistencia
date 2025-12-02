@@ -3,6 +3,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, IS_SUPABASE_CONFIGURED } from '@/lib/supabase'
 import { Database } from '@/lib/supabase'
+import { CURRENT_DATA_SOURCE } from '@/lib/data-source'
+import { useCursosFromSheets, useCursoFromSheets } from './useGoogleSheets'
 
 type Curso = Database['public']['Tables']['cursos']['Row']
 type CursoInsert = Database['public']['Tables']['cursos']['Insert']
@@ -21,6 +23,16 @@ type CursoWithRelations = Curso & {
 }
 
 export function useCursos() {
+  // Si estamos usando Google Sheets, usar el hook correspondiente
+  if (CURRENT_DATA_SOURCE === 'google-sheets') {
+    const { data, isLoading } = useCursosFromSheets()
+    return {
+      data: data || [],
+      isLoading,
+      error: null,
+    } as any
+  }
+
   return useQuery<CursoListItem[]>({
     queryKey: ['cursos'],
     queryFn: async () => {
@@ -75,6 +87,16 @@ export function useCursos() {
 }
 
 export function useCurso(id: string) {
+  // Si estamos usando Google Sheets, usar el hook correspondiente
+  if (CURRENT_DATA_SOURCE === 'google-sheets') {
+    const { data, isLoading } = useCursoFromSheets(id)
+    return {
+      data: data || null,
+      isLoading,
+      error: null,
+    } as any
+  }
+
   return useQuery<CursoWithRelations | null>({
     queryKey: ['curso', id],
     queryFn: async () => {

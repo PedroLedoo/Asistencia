@@ -1,8 +1,10 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase, IS_SUPABASE_CONFIGURED } from '@/lib/supabase'
 import { Database } from '@/lib/supabase'
+import { CURRENT_DATA_SOURCE } from '@/lib/data-source'
+import { useAsistenciasFromSheets, useAsistenciasPorFechaFromSheets } from './useGoogleSheets'
 
 type Asistencia = Database['public']['Tables']['asistencias']['Row']
 type AsistenciaInsert = Database['public']['Tables']['asistencias']['Insert']
@@ -86,9 +88,39 @@ export function useAsistenciasAlumno(alumnoId: string) {
 }
 
 export function useAsistenciasPorFecha(cursoId: string, fecha: string) {
+  // Si estamos usando Google Sheets, usar el hook correspondiente
+  if (CURRENT_DATA_SOURCE === 'google-sheets') {
+    const { data, isLoading } = useAsistenciasPorFechaFromSheets(cursoId, fecha)
+    return {
+      data: data || [],
+      isLoading,
+      error: null,
+    } as any
+  }
+
   return useQuery<AsistenciaPorFecha[]>({
     queryKey: ['asistencias', 'curso', cursoId, 'fecha', fecha],
     queryFn: async () => {
+      if (!IS_SUPABASE_CONFIGURED || !supabase) {
+        // Modo local: leer de localStorage
+        if (typeof window !== 'undefined') {
+          const alumnosLocales = JSON.parse(localStorage.getItem('alumnos_locales') || '[]')
+          const alumnosDelCurso = alumnosLocales.filter((a: any) => a.curso_id === cursoId)
+          const asistenciasLocales = JSON.parse(localStorage.getItem('asistencias_locales') || '[]')
+          
+          return alumnosDelCurso.map((alumno: any) => {
+            const asistencia = asistenciasLocales.find(
+              (a: any) => a.alumno_id === alumno.id && a.fecha === fecha
+            )
+            return {
+              alumno,
+              asistencia: asistencia || null
+            }
+          })
+        }
+        return []
+      }
+
       // Primero obtenemos todos los alumnos del curso
       const { data: alumnos, error: alumnosError } = await supabase
         .from('alumnos')

@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useCursos } from '@/hooks/useCursos'
 import { useAsistencia } from '@/hooks/useAsistencia'
+import { CURRENT_DATA_SOURCE } from '@/lib/data-source'
+import { useAsistenciasFromSheets } from '@/hooks/useGoogleSheets'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -43,74 +45,106 @@ export default function ReportesPage() {
 
     setExportando(true)
     try {
-      // Obtener todas las asistencias del curso
-      const { supabase, IS_SUPABASE_CONFIGURED } = await import('@/lib/supabase')
-      
-      if (!IS_SUPABASE_CONFIGURED || !supabase) {
-        // Modo local: datos de ejemplo
-        const dataEjemplo = [
-          {
-            'Curso': curso.nombre,
-            'Alumno': 'Ejemplo',
-            'Apellido': 'Alumno',
-            'DNI': '12345678',
-            'Fecha': new Date().toISOString().split('T')[0],
-            'Estado': 'Presente',
-            'Cargado Por': 'Profesor Local',
-            'Fecha de Carga': new Date().toLocaleString('es-AR')
-          }
-        ]
-        exportToCSV(dataEjemplo, `asistencias_${curso.nombre}_${new Date().toISOString().split('T')[0]}.csv`)
+      let data: any[] = []
+
+      // Si estamos usando Google Sheets
+      if (CURRENT_DATA_SOURCE === 'google-sheets') {
+        const { useAsistenciasFromSheets } = await import('@/hooks/useGoogleSheets')
+        // Necesitamos obtener los datos de forma síncrona, así que usamos el hook directamente
+        const asistenciasData = asistencias || []
+        
+        if (asistenciasData.length === 0) {
+          alert('No hay asistencias registradas para este curso')
+          setExportando(false)
+          return
+        }
+
+        data = asistenciasData.map((asistencia: any) => ({
+          'Curso': curso.nombre,
+          'Alumno': asistencia.alumno?.nombre || '',
+          'Apellido': asistencia.alumno?.apellido || '',
+          'DNI': asistencia.alumno?.dni || '',
+          'Fecha': asistencia.fecha,
+          'Estado': asistencia.estado ? asistencia.estado.charAt(0).toUpperCase() + asistencia.estado.slice(1) : '',
+          'Cargado Por': asistencia.cargado_por || '',
+          'Fecha de Carga': asistencia.creado_en ? new Date(asistencia.creado_en).toLocaleString('es-AR') : ''
+        }))
+      } else {
+        // Obtener todas las asistencias del curso
+        const { supabase, IS_SUPABASE_CONFIGURED } = await import('@/lib/supabase')
+        
+        if (!IS_SUPABASE_CONFIGURED || !supabase) {
+          // Modo local: datos de ejemplo
+          const dataEjemplo = [
+            {
+              'Curso': curso.nombre,
+              'Alumno': 'Ejemplo',
+              'Apellido': 'Alumno',
+              'DNI': '12345678',
+              'Fecha': new Date().toISOString().split('T')[0],
+              'Estado': 'Presente',
+              'Cargado Por': 'Profesor Local',
+              'Fecha de Carga': new Date().toLocaleString('es-AR')
+            }
+          ]
+          exportToCSV(dataEjemplo, `asistencias_${curso.nombre}_${new Date().toISOString().split('T')[0]}.csv`)
+          setExportando(false)
+          return
+        }
+
+        const { data: alumnos } = await supabase
+          .from('alumnos')
+          .select('*')
+          .eq('curso_id', cursoSeleccionado)
+
+        if (!alumnos) {
+          alert('No se encontraron alumnos')
+          setExportando(false)
+          return
+        }
+
+        const { data: asistenciasData } = await supabase
+          .from('asistencias')
+          .select(`
+            *,
+            alumnos (
+              nombre,
+              apellido,
+              dni
+            )
+          `)
+          .in('alumno_id', alumnos.map((a: { id: string }) => a.id))
+          .order('fecha', { ascending: false })
+
+        if (!asistenciasData || asistenciasData.length === 0) {
+          alert('No hay asistencias registradas para este curso')
+          setExportando(false)
+          return
+        }
+
+        data = asistenciasData.map((asistencia: any) => ({
+          'Curso': curso.nombre,
+          'Alumno': asistencia.alumnos?.nombre || '',
+          'Apellido': asistencia.alumnos?.apellido || '',
+          'DNI': asistencia.alumnos?.dni || '',
+          'Fecha': asistencia.fecha,
+          'Estado': asistencia.estado.charAt(0).toUpperCase() + asistencia.estado.slice(1),
+          'Cargado Por': asistencia.cargado_por || '',
+          'Fecha de Carga': new Date(asistencia.creado_en).toLocaleString('es-AR')
+        }))
+      }
+
+      if (data.length === 0) {
+        alert('No hay datos para exportar')
         setExportando(false)
         return
       }
-
-      const { data: alumnos } = await supabase
-        .from('alumnos')
-        .select('*')
-        .eq('curso_id', cursoSeleccionado)
-
-      if (!alumnos) {
-        alert('No se encontraron alumnos')
-        setExportando(false)
-        return
-      }
-
-      const { data: asistenciasData } = await supabase
-        .from('asistencias')
-        .select(`
-          *,
-          alumnos (
-            nombre,
-            apellido,
-            dni
-          )
-        `)
-        .in('alumno_id', alumnos.map((a: { id: string }) => a.id))
-        .order('fecha', { ascending: false })
-
-      if (!asistenciasData || asistenciasData.length === 0) {
-        alert('No hay asistencias registradas para este curso')
-        setExportando(false)
-        return
-      }
-
-      const data = asistenciasData.map((asistencia: any) => ({
-        'Curso': curso.nombre,
-        'Alumno': asistencia.alumnos?.nombre || '',
-        'Apellido': asistencia.alumnos?.apellido || '',
-        'DNI': asistencia.alumnos?.dni || '',
-        'Fecha': asistencia.fecha,
-        'Estado': asistencia.estado.charAt(0).toUpperCase() + asistencia.estado.slice(1),
-        'Cargado Por': asistencia.cargado_por || '',
-        'Fecha de Carga': new Date(asistencia.creado_en).toLocaleString('es-AR')
-      }))
 
       exportToCSV(data, `asistencias_${curso.nombre}_${new Date().toISOString().split('T')[0]}.csv`)
       alert('✅ Archivo CSV exportado correctamente. Puedes abrirlo en Google Sheets.')
     } catch (error) {
       console.error('Error al exportar:', error)
-      alert('Error al exportar las asistencias')
+      alert('Error al exportar las asistencias: ' + (error as Error).message)
     } finally {
       setExportando(false)
     }

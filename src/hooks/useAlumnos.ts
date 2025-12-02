@@ -1,16 +1,43 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase, IS_SUPABASE_CONFIGURED } from '@/lib/supabase'
 import { Database } from '@/lib/supabase'
+import { CURRENT_DATA_SOURCE } from '@/lib/data-source'
+import { useAlumnosFromSheets } from './useGoogleSheets'
 
 type Alumno = Database['public']['Tables']['alumnos']['Row']
 type AlumnoInsert = Database['public']['Tables']['alumnos']['Insert']
 
 export function useAlumnos(cursoId?: string) {
+  // Si estamos usando Google Sheets, usar el hook correspondiente
+  if (CURRENT_DATA_SOURCE === 'google-sheets') {
+    const { data, isLoading } = useAlumnosFromSheets(cursoId)
+    return {
+      data: data || [],
+      isLoading,
+      error: null,
+    } as any
+  }
+
   return useQuery({
     queryKey: ['alumnos', cursoId],
     queryFn: async () => {
+      if (!IS_SUPABASE_CONFIGURED || !supabase) {
+        // Modo local: leer de localStorage
+        if (typeof window !== 'undefined') {
+          const alumnosLocales = JSON.parse(localStorage.getItem('alumnos_locales') || '[]')
+          const alumnosFiltrados = cursoId 
+            ? alumnosLocales.filter((a: any) => a.curso_id === cursoId)
+            : alumnosLocales
+          return alumnosFiltrados.map((a: any) => ({
+            ...a,
+            cursos: { id: a.curso_id, nombre: 'Curso Local' }
+          }))
+        }
+        return []
+      }
+
       let query = supabase
         .from('alumnos')
         .select(`
@@ -65,6 +92,67 @@ export function useCreateAlumno() {
 
   return useMutation({
     mutationFn: async (alumno: AlumnoInsert) => {
+      // Si estamos usando Google Sheets
+      if (CURRENT_DATA_SOURCE === 'google-sheets') {
+        const appsScriptUrl = process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL
+        
+        if (!appsScriptUrl) {
+          throw new Error('Google Apps Script URL no configurada. Necesitas configurar NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL para escribir datos.')
+        }
+
+        const nuevoAlumno = {
+          id: `alumno_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          nombre: alumno.nombre || '',
+          apellido: alumno.apellido || '',
+          dni: alumno.dni || '',
+          curso_id: alumno.curso_id || '',
+          creado_en: new Date().toISOString(),
+        }
+
+        const response = await fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            sheet: 'Alumnos',
+            data: JSON.stringify([
+              nuevoAlumno.id,
+              nuevoAlumno.nombre,
+              nuevoAlumno.apellido,
+              nuevoAlumno.dni,
+              nuevoAlumno.curso_id,
+              nuevoAlumno.creado_en,
+            ]),
+            append: 'true'
+          })
+        })
+
+        if (!response.ok) {
+          throw new Error(`Error al escribir en Google Sheets: ${response.statusText}`)
+        }
+
+        return nuevoAlumno as any
+      }
+
+      // Modo local
+      if (!IS_SUPABASE_CONFIGURED || !supabase) {
+        const nuevoAlumno = {
+          id: `alumno_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          ...alumno,
+          creado_en: new Date().toISOString(),
+        }
+
+        if (typeof window !== 'undefined') {
+          const alumnosLocales = JSON.parse(localStorage.getItem('alumnos_locales') || '[]')
+          alumnosLocales.push(nuevoAlumno)
+          localStorage.setItem('alumnos_locales', JSON.stringify(alumnosLocales))
+        }
+
+        return nuevoAlumno as any
+      }
+
+      // Modo Supabase
       const { data, error } = await supabase
         .from('alumnos')
         .insert(alumno)
@@ -78,6 +166,9 @@ export function useCreateAlumno() {
       queryClient.invalidateQueries({ queryKey: ['alumnos'] })
       queryClient.invalidateQueries({ queryKey: ['alumnos', data.curso_id] })
       queryClient.invalidateQueries({ queryKey: ['curso', data.curso_id] })
+      if (CURRENT_DATA_SOURCE === 'google-sheets') {
+        queryClient.invalidateQueries({ queryKey: ['google-sheets', 'Alumnos'] })
+      }
     },
   })
 }
