@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase, IS_SUPABASE_CONFIGURED } from '@/lib/supabase'
 import { Database } from '@/lib/supabase'
 
 type Curso = Database['public']['Tables']['cursos']['Row']
@@ -24,6 +24,35 @@ export function useCursos() {
   return useQuery<CursoListItem[]>({
     queryKey: ['cursos'],
     queryFn: async () => {
+      // Verificar si Supabase está configurado
+      if (!IS_SUPABASE_CONFIGURED || !supabase) {
+        // Modo local: leer de localStorage
+        if (typeof window !== 'undefined') {
+          const cursosLocales = JSON.parse(localStorage.getItem('cursos_locales') || '[]')
+          const storedUser = localStorage.getItem('localUser')
+          const user = storedUser ? JSON.parse(storedUser) : null
+
+          // Filtrar cursos del usuario actual si hay usuario
+          const cursosFiltrados = user 
+            ? cursosLocales.filter((c: any) => c.profesor_id === user.id)
+            : cursosLocales
+
+          // Leer alumnos locales también
+          const alumnosLocales = JSON.parse(localStorage.getItem('alumnos_locales') || '[]')
+
+          return cursosFiltrados.map((curso: any) => {
+            const alumnosDelCurso = alumnosLocales.filter((a: any) => a.curso_id === curso.id)
+            return {
+              ...curso,
+              profesores: user ? { id: user.id, nombre: user.user_metadata?.nombre || user.email, email: user.email } : null,
+              alumnos: alumnosDelCurso.map((a: any) => ({ id: a.id }))
+            }
+          }) as CursoListItem[]
+        }
+        return []
+      }
+
+      // Modo Supabase: usar la base de datos real
       const { data, error } = await supabase
         .from('cursos')
         .select(`
@@ -81,6 +110,27 @@ export function useCreateCurso() {
 
   return useMutation({
     mutationFn: async (curso: CursoInsert) => {
+      // Verificar si Supabase está configurado
+      if (!IS_SUPABASE_CONFIGURED || !supabase) {
+        // Modo local: simular creación y guardar en localStorage
+        const nuevoCurso = {
+          id: `curso_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          nombre: curso.nombre,
+          profesor_id: curso.profesor_id,
+          creado_en: new Date().toISOString(),
+        }
+
+        // Guardar en localStorage para persistencia local
+        if (typeof window !== 'undefined') {
+          const cursosLocales = JSON.parse(localStorage.getItem('cursos_locales') || '[]')
+          cursosLocales.push(nuevoCurso)
+          localStorage.setItem('cursos_locales', JSON.stringify(cursosLocales))
+        }
+
+        return nuevoCurso as Curso
+      }
+
+      // Modo Supabase: usar la base de datos real
       const { data, error } = await supabase
         .from('cursos')
         .insert(curso)

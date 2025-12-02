@@ -141,3 +141,15 @@ Thumbs.db
 
 # Docker
 .dockerignore
+
+# Render
+.render/
+
+# Archivos de configuración local
+*.local
+.env*.local
+
+# Archivos temporales
+*.tmp
+*.temp
+.cache/
