@@ -11,12 +11,21 @@ const nextConfig = {
     domains: ['localhost']
   },
   // Asegurar que los path aliases funcionen correctamente en producción
-  webpack: (config) => {
+  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     // Configurar path aliases para cliente y servidor
+    const srcPath = path.resolve(__dirname, 'src')
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@': path.resolve(process.cwd(), 'src'),
+      '@': srcPath,
     }
+    
+    // Asegurar que los módulos se resuelvan correctamente
+    config.resolve.modules = [
+      ...(config.resolve.modules || []),
+      path.resolve(__dirname, 'src'),
+      'node_modules',
+    ]
+    
     return config
   }
 }
