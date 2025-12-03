@@ -184,6 +184,108 @@ export function useCreateAsistenciasBulk() {
 
   return useMutation({
     mutationFn: async (asistencias: AsistenciaInsert[]) => {
+      // Si estamos usando Google Sheets
+      if (CURRENT_DATA_SOURCE === 'google-sheets') {
+        const appsScriptUrl = process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL
+        
+        if (!appsScriptUrl) {
+          throw new Error('Google Apps Script URL no configurada. Necesitas configurar NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL para escribir datos.')
+        }
+
+        // Primero, eliminar asistencias existentes para estas fechas y alumnos (para evitar duplicados)
+        // Agrupamos por fecha y eliminamos todas las asistencias de esa fecha para esos alumnos
+        const fechasUnicas = [...new Set(asistencias.map(a => a.fecha))]
+        
+        for (const fecha of fechasUnicas) {
+          // Obtener todos los alumnos que tienen asistencia en esta fecha
+          const alumnosEnFecha = asistencias
+            .filter(a => a.fecha === fecha)
+            .map(a => a.alumno_id)
+          
+          // Eliminar asistencias existentes para esta fecha y estos alumnos
+          // Usamos deleteByFields para eliminar por alumno_id Y fecha
+          for (const alumnoId of alumnosEnFecha) {
+            await fetch(appsScriptUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({
+                action: 'deleteByFields',
+                sheet: 'Asistencias',
+                fields: JSON.stringify(['alumno_id', 'fecha']),
+                values: JSON.stringify([alumnoId, fecha])
+              })
+            }).catch(() => {
+              // Ignorar errores si no existe
+            })
+          }
+        }
+
+        // Crear nuevas asistencias
+        const nuevasAsistencias = asistencias.map(asistencia => ({
+          id: asistencia.id || `asist_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          alumno_id: asistencia.alumno_id,
+          fecha: asistencia.fecha,
+          estado: asistencia.estado,
+          cargado_por: asistencia.cargado_por,
+          creado_en: asistencia.creado_en || new Date().toISOString()
+        }))
+
+        // Escribir cada asistencia
+        for (const asistencia of nuevasAsistencias) {
+          const response = await fetch(appsScriptUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              sheet: 'Asistencias',
+              data: JSON.stringify([
+                asistencia.id,
+                asistencia.alumno_id,
+                asistencia.fecha,
+                asistencia.estado,
+                asistencia.cargado_por,
+                asistencia.creado_en
+              ]),
+              append: 'true'
+            })
+          })
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            throw new Error(`Error al escribir asistencia en Google Sheets: ${errorText}`)
+          }
+        }
+
+        return nuevasAsistencias as any
+      }
+
+      // Modo local
+      if (!IS_SUPABASE_CONFIGURED || !supabase) {
+        if (typeof window !== 'undefined') {
+          const asistenciasLocales = JSON.parse(localStorage.getItem('asistencias_locales') || '[]')
+          
+          // Eliminar asistencias existentes para estos alumnos y fechas
+          const nuevasAsistencias = asistencias.map(a => ({
+            id: a.id || `asist_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            ...a,
+            creado_en: a.creado_en || new Date().toISOString()
+          }))
+
+          // Filtrar asistencias existentes y agregar nuevas
+          const asistenciasFiltradas = asistenciasLocales.filter((a: any) => {
+            return !nuevasAsistencias.some(na => na.alumno_id === a.alumno_id && na.fecha === a.fecha)
+          })
+
+          asistenciasFiltradas.push(...nuevasAsistencias)
+          localStorage.setItem('asistencias_locales', JSON.stringify(asistenciasFiltradas))
+        }
+        return asistencias as any
+      }
+
+      // Modo Supabase
       const { data, error } = await supabase
         .from('asistencias')
         .upsert(asistencias, {
@@ -196,6 +298,10 @@ export function useCreateAsistenciasBulk() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['asistencias'] })
+      if (CURRENT_DATA_SOURCE === 'google-sheets') {
+        queryClient.invalidateQueries({ queryKey: ['google-sheets', 'Asistencias'] })
+        queryClient.invalidateQueries({ queryKey: ['asistencias', 'curso'] })
+      }
     },
   })
 }

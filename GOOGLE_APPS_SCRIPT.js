@@ -70,10 +70,65 @@ function doPost(e) {
     }
 
     // Manejar diferentes acciones
-    if (action === 'delete' || action === 'deleteByField') {
+    if (action === 'delete' || action === 'deleteByField' || action === 'deleteByFields') {
       // Eliminar fila(s)
-      if (action === 'deleteByField' && fieldName && fieldValue) {
-        // Buscar y eliminar por campo
+      if (action === 'deleteByFields' && e.parameter.fields && e.parameter.values) {
+        // Eliminar por múltiples campos (ej: alumno_id Y fecha)
+        const fieldsParam = e.parameter.fields; // JSON array de nombres de campos
+        const valuesParam = e.parameter.values; // JSON array de valores
+        const fields = JSON.parse(fieldsParam);
+        const values = JSON.parse(valuesParam);
+        
+        if (fields.length !== values.length) {
+          return ContentService
+            .createTextOutput(JSON.stringify({
+              success: false,
+              error: 'El número de campos y valores debe coincidir'
+            }))
+            .setMimeType(ContentService.MimeType.JSON);
+        }
+
+        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+        const fieldIndices = fields.map(fieldName => headers.indexOf(fieldName));
+        
+        if (fieldIndices.some(idx => idx === -1)) {
+          return ContentService
+            .createTextOutput(JSON.stringify({
+              success: false,
+              error: 'Uno o más campos no encontrados'
+            }))
+            .setMimeType(ContentService.MimeType.JSON);
+        }
+
+        // Buscar todas las filas que coincidan con TODOS los campos
+        const lastRow = sheet.getLastRow();
+        let deletedCount = 0;
+        
+        // Iterar desde el final hacia arriba para evitar problemas con índices
+        for (let i = lastRow; i > 1; i--) {
+          let matches = true;
+          for (let j = 0; j < fields.length; j++) {
+            const cellValue = sheet.getRange(i, fieldIndices[j] + 1).getValue();
+            if (String(cellValue) !== String(values[j])) {
+              matches = false;
+              break;
+            }
+          }
+          if (matches) {
+            sheet.deleteRow(i);
+            deletedCount++;
+          }
+        }
+
+        return ContentService
+          .createTextOutput(JSON.stringify({
+            success: true,
+            message: 'Eliminadas ' + deletedCount + ' fila(s)',
+            deletedCount: deletedCount
+          }))
+          .setMimeType(ContentService.MimeType.JSON);
+      } else if (action === 'deleteByField' && fieldName && fieldValue) {
+        // Buscar y eliminar por un solo campo
         const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
         const fieldIndex = headers.indexOf(fieldName);
         
@@ -110,7 +165,7 @@ function doPost(e) {
         return ContentService
           .createTextOutput(JSON.stringify({
             success: false,
-            error: 'Para eliminar, se requieren field y value'
+            error: 'Para eliminar, se requieren field y value, o fields y values'
           }))
           .setMimeType(ContentService.MimeType.JSON);
       }
