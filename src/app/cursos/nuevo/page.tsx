@@ -29,12 +29,14 @@ export default function NuevoCursoPage() {
         profesor_id: user.id
       })
       
-      // Esperar un momento para que se actualice la cache y se escriba en Google Sheets
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      console.log('✅ Curso creado:', nuevoCurso)
       
-      // Redirigir al detalle del curso
-      router.push(`/cursos/${nuevoCurso.id}`)
-      router.refresh() // Forzar actualización
+      // Esperar más tiempo para que Google Sheets se sincronice y la caché se actualice
+      // Invalidar explícitamente las queries de Google Sheets
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // Forzar recarga de la página para asegurar que se lea desde Google Sheets
+      window.location.href = `/cursos/${nuevoCurso.id}`
     } catch (error) {
       console.error('Error al crear curso:', error)
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido'

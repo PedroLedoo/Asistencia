@@ -46,10 +46,22 @@ export function useGoogleSheetsData<T>(sheetName: string, enabled: boolean = tru
       if (!GOOGLE_SHEETS_CONFIG.SPREADSHEET_ID) {
         throw new Error('Google Sheet ID no configurado. Ver GOOGLE_SHEETS_SETUP.md')
       }
-      return await readSheetData(sheetName) as T[]
+      const data = await readSheetData(sheetName) as T[]
+      
+      // Logging para debug (solo en desarrollo)
+      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+        console.log(`📄 Datos leídos de ${sheetName}:`, {
+          total: data.length,
+          primeros: data.slice(0, 3)
+        })
+      }
+      
+      return data
     },
     enabled: enabled && !!GOOGLE_SHEETS_CONFIG.SPREADSHEET_ID,
     refetchOnWindowFocus: false,
+    staleTime: 0, // Siempre considerar los datos como "stale" para forzar refetch
+    gcTime: 0, // No cachear para siempre obtener datos frescos (gcTime reemplaza a cacheTime en React Query v5)
   })
 }
 
@@ -72,13 +84,13 @@ export function useCursosFromSheets() {
   }
 
   // Combinar datos relacionados
-  const cursosConRelaciones = cursos?.map(curso => {
+  const cursosConRelaciones = cursos?.map((curso: Curso) => {
     // Normalizar IDs para comparación (pueden venir como string o número)
     const cursoId = String(curso.id || '').trim()
     const profesorId = String(curso.profesor_id || '').trim()
     
-    const profesor = profesores?.find(p => String(p.id || '').trim() === profesorId)
-    const alumnosDelCurso = alumnos?.filter(a => String(a.curso_id || '').trim() === cursoId) || []
+    const profesor = profesores?.find((p: Profesor) => String(p.id || '').trim() === profesorId)
+    const alumnosDelCurso = alumnos?.filter((a: Alumno) => String(a.curso_id || '').trim() === cursoId) || []
     
     return {
       ...curso,
@@ -102,14 +114,31 @@ export function useCursoFromSheets(cursoId: string) {
   
   // Normalizar ID para comparación
   const normalizedId = String(cursoId || '').trim()
-  const curso = cursos?.find(c => String(c.id || '').trim() === normalizedId)
   
-  // Logging para debug (solo en desarrollo)
-  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  // Buscar el curso con diferentes estrategias de comparación
+  const curso = cursos?.find((c: Curso & { profesores?: Profesor | null, alumnos?: Alumno[] }) => {
+    const cursoIdStr = String(c.id || '').trim()
+    // Comparación exacta
+    if (cursoIdStr === normalizedId) return true
+    // Comparación sin espacios
+    if (cursoIdStr.replace(/\s/g, '') === normalizedId.replace(/\s/g, '')) return true
+    // Comparación case-insensitive
+    if (cursoIdStr.toLowerCase() === normalizedId.toLowerCase()) return true
+    return false
+  })
+  
+  // Logging para debug (siempre, para ayudar a diagnosticar)
+  if (typeof window !== 'undefined') {
     console.log('🔍 Buscando curso:', {
       cursoIdBuscado: normalizedId,
-      cursosDisponibles: cursos?.map(c => ({ id: c.id, nombre: c.nombre })),
-      cursoEncontrado: curso ? { id: curso.id, nombre: curso.nombre } : null
+      totalCursos: cursos?.length || 0,
+      cursosDisponibles: cursos?.map((c: Curso & { profesores?: Profesor | null, alumnos?: Alumno[] }) => ({ 
+        id: c.id, 
+        idNormalizado: String(c.id || '').trim(),
+        nombre: c.nombre 
+      })),
+      cursoEncontrado: curso ? { id: curso.id, nombre: curso.nombre } : null,
+      coincidencia: curso ? '✅' : '❌'
     })
   }
   
@@ -126,7 +155,7 @@ export function useAlumnosFromSheets(cursoId?: string) {
   const { data: alumnos, isLoading } = useGoogleSheetsData<Alumno>(SHEETS.ALUMNOS)
   
   const alumnosFiltrados = cursoId 
-    ? alumnos?.filter(a => a.curso_id === cursoId)
+    ? alumnos?.filter((a: Alumno) => String(a.curso_id || '').trim() === String(cursoId).trim())
     : alumnos
 
   return {
@@ -146,18 +175,18 @@ export function useAsistenciasFromSheets(cursoId?: string, fecha?: string) {
 
   // Filtrar por curso si se especifica
   if (cursoId && alumnos) {
-    const alumnosIds = alumnos.map(a => a.id)
-    asistenciasFiltradas = asistenciasFiltradas.filter(a => alumnosIds.includes(a.alumno_id))
+    const alumnosIds = alumnos.map((a: Alumno) => a.id)
+    asistenciasFiltradas = asistenciasFiltradas.filter((a: Asistencia) => alumnosIds.includes(a.alumno_id))
   }
 
   // Filtrar por fecha si se especifica
   if (fecha) {
-    asistenciasFiltradas = asistenciasFiltradas.filter(a => a.fecha === fecha)
+    asistenciasFiltradas = asistenciasFiltradas.filter((a: Asistencia) => a.fecha === fecha)
   }
 
   // Combinar con datos de alumnos
-  const asistenciasConAlumnos = asistenciasFiltradas.map(asistencia => {
-    const alumno = alumnos?.find(a => a.id === asistencia.alumno_id)
+  const asistenciasConAlumnos = asistenciasFiltradas.map((asistencia: Asistencia) => {
+    const alumno = alumnos?.find((a: Alumno) => a.id === asistencia.alumno_id)
     return {
       ...asistencia,
       alumno: alumno || null
@@ -178,8 +207,8 @@ export function useAsistenciasPorFechaFromSheets(cursoId: string, fecha: string)
   const { data: asistencias } = useAsistenciasFromSheets(cursoId, fecha)
 
   // Combinar alumnos con sus asistencias
-  const resultado = alumnos?.map(alumno => {
-    const asistencia = asistencias?.find(a => a.alumno_id === alumno.id)
+  const resultado = alumnos?.map((alumno: Alumno) => {
+    const asistencia = asistencias?.find((a: Asistencia) => a.alumno_id === alumno.id)
     return {
       alumno,
       asistencia: asistencia || null
@@ -256,7 +285,7 @@ export function useCreateAsistenciasBulkInSheets() {
 
   return useMutation({
     mutationFn: async (asistencias: Omit<Asistencia, 'id' | 'creado_en'>[]) => {
-      const nuevasAsistencias: Asistencia[] = asistencias.map(asistencia => ({
+      const nuevasAsistencias: Asistencia[] = asistencias.map((asistencia: Omit<Asistencia, 'id' | 'creado_en'>) => ({
         ...asistencia,
         id: `asist_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         creado_en: new Date().toISOString()

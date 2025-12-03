@@ -266,10 +266,13 @@ export function useCreateCurso() {
       if (error) throw error
       return data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['cursos'] })
+      queryClient.invalidateQueries({ queryKey: ['curso', data.id] })
       if (CURRENT_DATA_SOURCE === 'google-sheets') {
         queryClient.invalidateQueries({ queryKey: ['google-sheets', 'Cursos'] })
+        queryClient.invalidateQueries({ queryKey: ['google-sheets', 'Alumnos'] })
+        queryClient.invalidateQueries({ queryKey: ['google-sheets', 'Profesores'] })
       }
     },
   })
