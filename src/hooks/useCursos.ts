@@ -205,9 +205,32 @@ export function useCreateCurso() {
           })
         })
 
+        // Leer la respuesta
+        const responseText = await response.text()
+        
         if (!response.ok) {
-          const errorText = await response.text()
-          throw new Error(`Error al escribir curso en Google Sheets: ${errorText}`)
+          console.error('Error de respuesta de Apps Script:', {
+            status: response.status,
+            statusText: response.statusText,
+            responseText
+          })
+          throw new Error(`Error al escribir curso en Google Sheets (${response.status}): ${responseText}`)
+        }
+
+        // Verificar que la respuesta sea exitosa (puede ser JSON o texto)
+        try {
+          const result = JSON.parse(responseText)
+          if (result.success === false) {
+            throw new Error(result.error || 'Error desconocido al escribir en Google Sheets')
+          }
+          console.log('Curso creado exitosamente en Google Sheets:', result)
+        } catch (parseError) {
+          // Si no es JSON válido, verificar si es un mensaje de éxito
+          if (responseText.includes('success') || responseText.includes('correctamente')) {
+            console.log('Curso creado exitosamente en Google Sheets')
+          } else {
+            console.warn('Respuesta inesperada de Apps Script:', responseText)
+          }
         }
 
         return nuevoCurso as Curso

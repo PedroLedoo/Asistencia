@@ -38,7 +38,18 @@ export default function NuevoCursoPage() {
     } catch (error) {
       console.error('Error al crear curso:', error)
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido'
-      alert(`Error al crear el curso: ${errorMessage}`)
+      
+      // Mostrar mensaje más detallado
+      let mensajeUsuario = `Error al crear el curso: ${errorMessage}`
+      
+      // Mensajes de ayuda según el tipo de error
+      if (errorMessage.includes('Google Apps Script URL no configurada')) {
+        mensajeUsuario += '\n\nSolución: Configura NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL en Render o .env.local'
+      } else if (errorMessage.includes('Error al escribir curso en Google Sheets')) {
+        mensajeUsuario += '\n\nVerifica:\n1. Que el Apps Script esté desplegado correctamente\n2. Que tenga permisos para editar la hoja\n3. Que el SPREADSHEET_ID en el Apps Script sea correcto'
+      }
+      
+      alert(mensajeUsuario)
     }
   }
 
