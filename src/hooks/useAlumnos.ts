@@ -10,17 +10,10 @@ type Alumno = Database['public']['Tables']['alumnos']['Row']
 type AlumnoInsert = Database['public']['Tables']['alumnos']['Insert']
 
 export function useAlumnos(cursoId?: string) {
-  // Si estamos usando Google Sheets, usar el hook correspondiente
-  if (CURRENT_DATA_SOURCE === 'google-sheets') {
-    const { data, isLoading } = useAlumnosFromSheets(cursoId)
-    return {
-      data: data || [],
-      isLoading,
-      error: null,
-    } as any
-  }
-
-  return useQuery({
+  // Siempre llamar ambos hooks, pero solo usar uno según la fuente de datos
+  const sheetsData = useAlumnosFromSheets(cursoId)
+  
+  const supabaseQuery = useQuery({
     queryKey: ['alumnos', cursoId],
     queryFn: async () => {
       if (!IS_SUPABASE_CONFIGURED || !supabase) {
@@ -58,7 +51,19 @@ export function useAlumnos(cursoId?: string) {
       if (error) throw error
       return data
     },
+    enabled: CURRENT_DATA_SOURCE !== 'google-sheets',
   })
+
+  // Retornar datos según la fuente activa
+  if (CURRENT_DATA_SOURCE === 'google-sheets') {
+    return {
+      data: sheetsData.data || [],
+      isLoading: sheetsData.isLoading,
+      error: null,
+    } as any
+  }
+
+  return supabaseQuery
 }
 
 export function useAlumno(id: string) {

@@ -88,17 +88,10 @@ export function useAsistenciasAlumno(alumnoId: string) {
 }
 
 export function useAsistenciasPorFecha(cursoId: string, fecha: string) {
-  // Si estamos usando Google Sheets, usar el hook correspondiente
-  if (CURRENT_DATA_SOURCE === 'google-sheets') {
-    const { data, isLoading } = useAsistenciasPorFechaFromSheets(cursoId, fecha)
-    return {
-      data: data || [],
-      isLoading,
-      error: null,
-    } as any
-  }
-
-  return useQuery<AsistenciaPorFecha[]>({
+  // Siempre llamar ambos hooks, pero solo usar uno según la fuente de datos
+  const sheetsData = useAsistenciasPorFechaFromSheets(cursoId, fecha)
+  
+  const supabaseQuery = useQuery<AsistenciaPorFecha[]>({
     queryKey: ['asistencias', 'curso', cursoId, 'fecha', fecha],
     queryFn: async () => {
       if (!IS_SUPABASE_CONFIGURED || !supabase) {
@@ -151,8 +144,19 @@ export function useAsistenciasPorFecha(cursoId: string, fecha: string) {
 
       return resultado
     },
-    enabled: !!(cursoId && fecha),
+    enabled: !!(cursoId && fecha) && CURRENT_DATA_SOURCE !== 'google-sheets',
   })
+
+  // Retornar datos según la fuente activa
+  if (CURRENT_DATA_SOURCE === 'google-sheets') {
+    return {
+      data: sheetsData.data || [],
+      isLoading: sheetsData.isLoading,
+      error: null,
+    } as any
+  }
+
+  return supabaseQuery
 }
 
 export function useCreateAsistencia() {

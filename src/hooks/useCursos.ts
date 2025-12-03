@@ -23,17 +23,10 @@ type CursoWithRelations = Curso & {
 }
 
 export function useCursos() {
-  // Si estamos usando Google Sheets, usar el hook correspondiente
-  if (CURRENT_DATA_SOURCE === 'google-sheets') {
-    const { data, isLoading } = useCursosFromSheets()
-    return {
-      data: data || [],
-      isLoading,
-      error: null,
-    } as any
-  }
-
-  return useQuery<CursoListItem[]>({
+  // Siempre llamar ambos hooks, pero solo usar uno según la fuente de datos
+  const sheetsData = useCursosFromSheets()
+  
+  const supabaseQuery = useQuery<CursoListItem[]>({
     queryKey: ['cursos'],
     queryFn: async () => {
       // Verificar si Supabase está configurado
@@ -83,21 +76,26 @@ export function useCursos() {
       if (error) throw error
       return data as CursoListItem[]
     },
+    enabled: CURRENT_DATA_SOURCE !== 'google-sheets',
   })
-}
 
-export function useCurso(id: string) {
-  // Si estamos usando Google Sheets, usar el hook correspondiente
+  // Retornar datos según la fuente activa
   if (CURRENT_DATA_SOURCE === 'google-sheets') {
-    const { data, isLoading } = useCursoFromSheets(id)
     return {
-      data: data || null,
-      isLoading,
+      data: sheetsData.data || [],
+      isLoading: sheetsData.isLoading,
       error: null,
     } as any
   }
 
-  return useQuery<CursoWithRelations | null>({
+  return supabaseQuery
+}
+
+export function useCurso(id: string) {
+  // Siempre llamar ambos hooks, pero solo usar uno según la fuente de datos
+  const sheetsData = useCursoFromSheets(id)
+  
+  const supabaseQuery = useQuery<CursoWithRelations | null>({
     queryKey: ['curso', id],
     queryFn: async () => {
       // Verificar si Supabase está configurado
@@ -155,8 +153,19 @@ export function useCurso(id: string) {
       if (error) throw error
       return data as CursoWithRelations
     },
-    enabled: !!id,
+    enabled: !!id && CURRENT_DATA_SOURCE !== 'google-sheets',
   })
+
+  // Retornar datos según la fuente activa
+  if (CURRENT_DATA_SOURCE === 'google-sheets') {
+    return {
+      data: sheetsData.data || null,
+      isLoading: sheetsData.isLoading,
+      error: null,
+    } as any
+  }
+
+  return supabaseQuery
 }
 
 export function useCreateCurso() {
