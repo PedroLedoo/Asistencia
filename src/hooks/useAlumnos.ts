@@ -207,7 +207,77 @@ export function useDeleteAlumno() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      // Primero obtenemos el alumno para invalidar las queries correctas
+      // Si estamos usando Google Sheets
+      if (CURRENT_DATA_SOURCE === 'google-sheets') {
+        const appsScriptUrl = process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL
+        
+        if (!appsScriptUrl) {
+          throw new Error('Google Apps Script URL no configurada. Necesitas configurar NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL para eliminar datos.')
+        }
+
+        // Primero leer el alumno para obtener el curso_id antes de eliminarlo
+        // Leemos desde Google Sheets para obtener el curso_id
+        const alumnosData = await fetch(
+          `https://docs.google.com/spreadsheets/d/${process.env.NEXT_PUBLIC_GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Alumnos`
+        ).then(res => res.text())
+
+        const lines = alumnosData.split('\n').filter(line => line.trim().length > 0)
+        if (lines.length < 2) {
+          throw new Error('No se encontraron alumnos en Google Sheets')
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase())
+        const idIndex = headers.indexOf('id')
+        const cursoIdIndex = headers.indexOf('curso_id')
+
+        if (idIndex === -1 || cursoIdIndex === -1) {
+          throw new Error('Estructura de datos incorrecta en Google Sheets')
+        }
+
+        let cursoId: string | null = null
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''))
+          if (values[idIndex] === id) {
+            cursoId = values[cursoIdIndex]
+            break
+          }
+        }
+
+        // Eliminar el alumno
+        const response = await fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            action: 'deleteByField',
+            sheet: 'Alumnos',
+            field: 'id',
+            value: id
+          })
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          throw new Error(`Error al eliminar alumno en Google Sheets: ${errorText}`)
+        }
+
+        return { curso_id: cursoId } as any
+      }
+
+      // Modo local
+      if (!IS_SUPABASE_CONFIGURED || !supabase) {
+        if (typeof window !== 'undefined') {
+          const alumnosLocales = JSON.parse(localStorage.getItem('alumnos_locales') || '[]')
+          const alumno = alumnosLocales.find((a: any) => a.id === id)
+          const alumnosFiltrados = alumnosLocales.filter((a: any) => a.id !== id)
+          localStorage.setItem('alumnos_locales', JSON.stringify(alumnosFiltrados))
+          return alumno || { curso_id: null }
+        }
+        return { curso_id: null }
+      }
+
+      // Modo Supabase: primero obtenemos el alumno para invalidar las queries correctas
       const { data: alumno } = await supabase
         .from('alumnos')
         .select('curso_id')
@@ -227,6 +297,9 @@ export function useDeleteAlumno() {
       if (alumno) {
         queryClient.invalidateQueries({ queryKey: ['alumnos', alumno.curso_id] })
         queryClient.invalidateQueries({ queryKey: ['curso', alumno.curso_id] })
+      }
+      if (CURRENT_DATA_SOURCE === 'google-sheets') {
+        queryClient.invalidateQueries({ queryKey: ['google-sheets', 'Alumnos'] })
       }
     },
   })

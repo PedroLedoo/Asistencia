@@ -173,6 +173,46 @@ export function useCreateCurso() {
 
   return useMutation({
     mutationFn: async (curso: CursoInsert) => {
+      // Si estamos usando Google Sheets
+      if (CURRENT_DATA_SOURCE === 'google-sheets') {
+        const appsScriptUrl = process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL
+        
+        if (!appsScriptUrl) {
+          throw new Error('Google Apps Script URL no configurada. Necesitas configurar NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL para escribir datos.')
+        }
+
+        const nuevoCurso = {
+          id: `curso_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          nombre: curso.nombre || '',
+          profesor_id: curso.profesor_id || '',
+          creado_en: new Date().toISOString(),
+        }
+
+        const response = await fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            sheet: 'Cursos',
+            data: JSON.stringify([
+              nuevoCurso.id,
+              nuevoCurso.nombre,
+              nuevoCurso.profesor_id,
+              nuevoCurso.creado_en,
+            ]),
+            append: 'true'
+          })
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          throw new Error(`Error al escribir curso en Google Sheets: ${errorText}`)
+        }
+
+        return nuevoCurso as Curso
+      }
+
       // Verificar si Supabase está configurado
       if (!IS_SUPABASE_CONFIGURED || !supabase) {
         // Modo local: simular creación y guardar en localStorage
@@ -205,6 +245,9 @@ export function useCreateCurso() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cursos'] })
+      if (CURRENT_DATA_SOURCE === 'google-sheets') {
+        queryClient.invalidateQueries({ queryKey: ['google-sheets', 'Cursos'] })
+      }
     },
   })
 }
