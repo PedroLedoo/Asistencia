@@ -77,7 +77,7 @@ export default function CursoDetailPage() {
   const handleExportCSV = () => {
     if (!curso?.alumnos) return
     
-    const data = curso.alumnos.map(alumno => ({
+    const data = curso.alumnos.map((alumno: { id: string; nombre: string; apellido: string; dni: string; creado_en: string }) => ({
       'Nombre': alumno.nombre,
       'Apellido': alumno.apellido,
       'DNI': alumno.dni,
@@ -305,7 +305,7 @@ export default function CursoDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {curso.alumnos.map((alumno) => (
+                {curso.alumnos.map((alumno: { id: string; nombre: string; apellido: string; dni: string; creado_en: string }) => (
                   <TableRow key={alumno.id}>
                     <TableCell className="font-medium">{alumno.nombre}</TableCell>
                     <TableCell>{alumno.apellido}</TableCell>

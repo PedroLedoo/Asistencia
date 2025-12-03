@@ -71,7 +71,7 @@ export default function CursosPage() {
       {/* Lista de cursos */}
       {cursos && cursos.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {cursos.map((curso) => (
+          {cursos.map((curso: { id: string; nombre: string; alumnos?: { id: string }[] | null; profesores?: { id: string; nombre: string; email: string } | null; creado_en: string }) => (
             <Card key={curso.id} className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">

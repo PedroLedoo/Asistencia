@@ -34,7 +34,7 @@ export default function ReportesPage() {
     cursoSeleccionado || undefined
   )
 
-  const curso = cursos?.find(c => c.id === cursoSeleccionado)
+  const curso = cursos?.find((c: { id: string }) => c.id === cursoSeleccionado)
 
   // Exportar todas las asistencias de un curso
   const exportarAsistenciasCompletas = async () => {
@@ -348,7 +348,7 @@ export default function ReportesPage() {
       return
     }
 
-    const data = cursos.map(curso => ({
+    const data = cursos.map((curso: { id: string; nombre: string; profesores?: { nombre?: string; email?: string } | null; alumnos?: { id: string }[] | null; creado_en: string }) => ({
       'ID': curso.id,
       'Nombre': curso.nombre,
       'Profesor': (curso.profesores as any)?.nombre || '',
@@ -425,7 +425,7 @@ export default function ReportesPage() {
                   <SelectValue placeholder="Selecciona un curso" />
                 </SelectTrigger>
                 <SelectContent>
-                  {cursos?.map(curso => (
+                  {cursos?.map((curso: { id: string; nombre: string; alumnos?: { id: string }[] | null }) => (
                     <SelectItem key={curso.id} value={curso.id}>
                       {curso.nombre} ({curso.alumnos?.length || 0} alumnos)
                     </SelectItem>

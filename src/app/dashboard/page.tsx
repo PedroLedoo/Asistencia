@@ -56,7 +56,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {cursos?.reduce((total, curso) => total + (curso.alumnos?.length || 0), 0) || 0}
+              {cursos?.reduce((total: number, curso: { alumnos?: { id: string }[] | null }) => total + (curso.alumnos?.length || 0), 0) || 0}
             </div>
             <p className="text-xs text-muted-foreground">
               En todos los cursos
@@ -152,7 +152,7 @@ export default function DashboardPage() {
 
         {cursos && cursos.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {cursos.map((curso) => (
+            {cursos.map((curso: { id: string; nombre: string; alumnos?: { id: string }[] | null; profesores?: { id: string; nombre: string; email: string } | null; creado_en: string }) => (
               <Card key={curso.id} className="hover:shadow-md transition-shadow">
                 <CardHeader>
                   <CardTitle className="text-lg">{curso.nombre}</CardTitle>
