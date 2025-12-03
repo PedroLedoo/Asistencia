@@ -53,13 +53,28 @@ export async function readSheetData(sheetName: string, range?: string): Promise<
       const rows = data.values.slice(1)
 
       // Convertir filas a objetos
-      return rows.map((row: any[]) => {
+      const result = rows.map((row: any[]) => {
         const obj: any = {}
         headers.forEach((header: string, index: number) => {
+          // Normalizar nombres de columnas (minúsculas, sin espacios)
+          const normalizedHeader = header.toLowerCase().trim()
+          obj[normalizedHeader] = row[index] || ''
+          // También mantener el nombre original por compatibilidad
           obj[header] = row[index] || ''
         })
         return obj
       })
+      
+      // Logging para debug (solo en desarrollo)
+      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+        console.log(`📄 Datos leídos de ${sheetName}:`, {
+          headers,
+          totalRows: result.length,
+          firstRow: result[0]
+        })
+      }
+      
+      return result
     } catch (error) {
       console.error('Error al leer Google Sheets con API:', error)
       throw error
@@ -115,6 +130,10 @@ export async function readSheetData(sheetName: string, range?: string): Promise<
 
       const obj: any = {}
       headers.forEach((header: string, index: number) => {
+        // Normalizar nombres de columnas (minúsculas, sin espacios)
+        const normalizedHeader = header.toLowerCase().trim()
+        obj[normalizedHeader] = values[index] || ''
+        // También mantener el nombre original por compatibilidad
         obj[header] = values[index] || ''
       })
       return obj

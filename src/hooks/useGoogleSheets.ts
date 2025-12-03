@@ -61,13 +61,28 @@ export function useCursosFromSheets() {
   const { data: profesores } = useGoogleSheetsData<Profesor>(SHEETS.PROFESORES)
   const { data: alumnos } = useGoogleSheetsData<Alumno>(SHEETS.ALUMNOS)
 
+  // Logging para debug (solo en desarrollo)
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    console.log('📊 Datos de Google Sheets:', {
+      cursos: cursos?.length || 0,
+      profesores: profesores?.length || 0,
+      alumnos: alumnos?.length || 0,
+      cursosData: cursos,
+    })
+  }
+
   // Combinar datos relacionados
   const cursosConRelaciones = cursos?.map(curso => {
-    const profesor = profesores?.find(p => p.id === curso.profesor_id)
-    const alumnosDelCurso = alumnos?.filter(a => a.curso_id === curso.id) || []
+    // Normalizar IDs para comparación (pueden venir como string o número)
+    const cursoId = String(curso.id || '').trim()
+    const profesorId = String(curso.profesor_id || '').trim()
+    
+    const profesor = profesores?.find(p => String(p.id || '').trim() === profesorId)
+    const alumnosDelCurso = alumnos?.filter(a => String(a.curso_id || '').trim() === cursoId) || []
     
     return {
       ...curso,
+      id: cursoId, // Asegurar que el ID sea string
       profesores: profesor || null,
       alumnos: alumnosDelCurso
     }
@@ -85,7 +100,18 @@ export function useCursosFromSheets() {
 export function useCursoFromSheets(cursoId: string) {
   const { data: cursos, isLoading } = useCursosFromSheets()
   
-  const curso = cursos?.find(c => c.id === cursoId)
+  // Normalizar ID para comparación
+  const normalizedId = String(cursoId || '').trim()
+  const curso = cursos?.find(c => String(c.id || '').trim() === normalizedId)
+  
+  // Logging para debug (solo en desarrollo)
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    console.log('🔍 Buscando curso:', {
+      cursoIdBuscado: normalizedId,
+      cursosDisponibles: cursos?.map(c => ({ id: c.id, nombre: c.nombre })),
+      cursoEncontrado: curso ? { id: curso.id, nombre: curso.nombre } : null
+    })
+  }
   
   return {
     data: curso || null,

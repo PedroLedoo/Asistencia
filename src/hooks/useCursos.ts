@@ -236,6 +236,59 @@ export function useDeleteCurso() {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      // Si estamos usando Google Sheets
+      if (CURRENT_DATA_SOURCE === 'google-sheets') {
+        const appsScriptUrl = process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL
+        
+        if (!appsScriptUrl) {
+          throw new Error('Google Apps Script URL no configurada. Necesitas configurar NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL para eliminar datos.')
+        }
+
+        // Eliminar curso
+        const responseCurso = await fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            action: 'deleteByField',
+            sheet: 'Cursos',
+            field: 'id',
+            value: id
+          })
+        })
+
+        if (!responseCurso.ok) {
+          const errorData = await responseCurso.text()
+          throw new Error(`Error al eliminar curso: ${errorData}`)
+        }
+
+        // También eliminar alumnos asociados
+        const responseAlumnos = await fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            action: 'deleteByField',
+            sheet: 'Alumnos',
+            field: 'curso_id',
+            value: id
+          })
+        })
+
+        // No lanzar error si no hay alumnos (puede que no existan)
+        if (!responseAlumnos.ok) {
+          console.warn('Advertencia al eliminar alumnos asociados:', await responseAlumnos.text())
+        }
+
+        // Eliminar asistencias asociadas (primero necesitamos los IDs de los alumnos)
+        // Por ahora, eliminamos por curso_id indirectamente
+        // Esto requiere una mejora en el Apps Script o leer primero los alumnos
+        
+        return
+      }
+
       // Verificar si Supabase está configurado
       if (!IS_SUPABASE_CONFIGURED || !supabase) {
         // Modo local: eliminar de localStorage
@@ -268,6 +321,10 @@ export function useDeleteCurso() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cursos'] })
+      if (CURRENT_DATA_SOURCE === 'google-sheets') {
+        queryClient.invalidateQueries({ queryKey: ['google-sheets', 'Cursos'] })
+        queryClient.invalidateQueries({ queryKey: ['google-sheets', 'Alumnos'] })
+      }
     },
   })
 }

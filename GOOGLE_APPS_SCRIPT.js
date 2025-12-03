@@ -33,48 +33,117 @@ const SHEETS = {
 function doPost(e) {
   try {
     // Obtener los parámetros de la petición
+    const action = e.parameter.action || 'write'; // 'write', 'delete', 'deleteByField'
     const sheetName = e.parameter.sheet;
     const dataParam = e.parameter.data;
     const append = e.parameter.append === 'true';
+    const fieldName = e.parameter.field; // Campo para buscar (ej: 'id')
+    const fieldValue = e.parameter.value; // Valor a buscar
 
-    if (!sheetName || !dataParam) {
+    if (!sheetName) {
       return ContentService
         .createTextOutput(JSON.stringify({
           success: false,
-          error: 'Faltan parámetros: sheet y data son requeridos'
+          error: 'Falta el parámetro: sheet es requerido'
         }))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
-    // Parsear los datos
-    const data = JSON.parse(dataParam);
-    
     // Obtener la hoja de cálculo
     const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
     let sheet = spreadsheet.getSheetByName(sheetName);
 
-    // Si la hoja no existe, crearla
-    if (!sheet) {
+    // Si la hoja no existe, crearla (solo para escritura)
+    if (!sheet && action === 'write') {
       sheet = spreadsheet.insertSheet(sheetName);
       // Agregar encabezados según la hoja
       setHeaders(sheet, sheetName);
     }
 
-    // Escribir los datos
-    if (append) {
-      // Agregar al final
-      sheet.appendRow(data);
-    } else {
-      // Escribir en una fila específica (no implementado por ahora)
-      sheet.appendRow(data);
+    if (!sheet) {
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          success: false,
+          error: 'La hoja no existe: ' + sheetName
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
     }
 
-    return ContentService
-      .createTextOutput(JSON.stringify({
-        success: true,
-        message: 'Datos escritos correctamente'
-      }))
-      .setMimeType(ContentService.MimeType.JSON);
+    // Manejar diferentes acciones
+    if (action === 'delete' || action === 'deleteByField') {
+      // Eliminar fila(s)
+      if (action === 'deleteByField' && fieldName && fieldValue) {
+        // Buscar y eliminar por campo
+        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+        const fieldIndex = headers.indexOf(fieldName);
+        
+        if (fieldIndex === -1) {
+          return ContentService
+            .createTextOutput(JSON.stringify({
+              success: false,
+              error: 'Campo no encontrado: ' + fieldName
+            }))
+            .setMimeType(ContentService.MimeType.JSON);
+        }
+
+        // Buscar todas las filas que coincidan
+        const lastRow = sheet.getLastRow();
+        let deletedCount = 0;
+        
+        // Iterar desde el final hacia arriba para evitar problemas con índices
+        for (let i = lastRow; i > 1; i--) {
+          const cellValue = sheet.getRange(i, fieldIndex + 1).getValue();
+          if (String(cellValue) === String(fieldValue)) {
+            sheet.deleteRow(i);
+            deletedCount++;
+          }
+        }
+
+        return ContentService
+          .createTextOutput(JSON.stringify({
+            success: true,
+            message: 'Eliminadas ' + deletedCount + ' fila(s)',
+            deletedCount: deletedCount
+          }))
+          .setMimeType(ContentService.MimeType.JSON);
+      } else {
+        return ContentService
+          .createTextOutput(JSON.stringify({
+            success: false,
+            error: 'Para eliminar, se requieren field y value'
+          }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+    } else {
+      // Escribir datos
+      if (!dataParam) {
+        return ContentService
+          .createTextOutput(JSON.stringify({
+            success: false,
+            error: 'Falta el parámetro: data es requerido para escribir'
+          }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+
+      // Parsear los datos
+      const data = JSON.parse(dataParam);
+
+      // Escribir los datos
+      if (append) {
+        // Agregar al final
+        sheet.appendRow(data);
+      } else {
+        // Escribir en una fila específica (no implementado por ahora)
+        sheet.appendRow(data);
+      }
+
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          success: true,
+          message: 'Datos escritos correctamente'
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
 
   } catch (error) {
     return ContentService
