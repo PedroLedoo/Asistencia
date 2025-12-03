@@ -99,7 +99,7 @@ export default function NuevoCursoPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Profesor Asignado</Label>
+              <p className="text-sm font-medium text-gray-700">Profesor Asignado</p>
               <div className="p-3 bg-gray-50 rounded-md">
                 <p className="font-medium">{user?.user_metadata?.nombre || user?.email}</p>
                 <p className="text-sm text-gray-600">Este curso será asignado a tu usuario</p>

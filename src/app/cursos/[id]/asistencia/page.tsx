@@ -362,7 +362,7 @@ export default function AsistenciaPage() {
                           handleAsistenciaChange(alumno.id, value)
                         }
                       >
-                        <SelectTrigger className="w-32">
+                        <SelectTrigger className="w-32" aria-label={`Estado de asistencia para ${alumno.nombre} ${alumno.apellido}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

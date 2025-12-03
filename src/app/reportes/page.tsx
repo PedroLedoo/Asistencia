@@ -419,9 +419,9 @@ export default function ReportesPage() {
         <CardContent>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="curso">Curso</Label>
+              <Label id="curso-label">Curso</Label>
               <Select value={cursoSeleccionado} onValueChange={setCursoSeleccionado}>
-                <SelectTrigger id="curso">
+                <SelectTrigger aria-labelledby="curso-label">
                   <SelectValue placeholder="Selecciona un curso" />
                 </SelectTrigger>
                 <SelectContent>

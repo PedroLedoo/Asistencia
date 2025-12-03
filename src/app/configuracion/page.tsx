@@ -207,7 +207,7 @@ export default function ConfiguracionPage() {
                     <li>Ve a tu Google Sheet → <strong>Extensiones → Apps Script</strong></li>
                     <li>Copia el código de <code className="bg-yellow-100 px-1 rounded">GOOGLE_APPS_SCRIPT.js</code></li>
                     <li>Reemplaza <code className="bg-yellow-100 px-1 rounded">TU_SHEET_ID_AQUI</code> con tu ID real</li>
-                    <li><strong>Despliega</strong> como "Aplicación web" con acceso "Cualquiera"</li>
+                    <li><strong>Despliega</strong> como &quot;Aplicación web&quot; con acceso &quot;Cualquiera&quot;</li>
                     <li>Copia la URL y agrégala en <strong>Render → Environment → NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL</strong></li>
                   </ol>
                   <Button asChild variant="outline" className="w-full mt-2">
